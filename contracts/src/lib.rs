@@ -1,5 +1,16 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
+/// The `pension_manager` ink! smart contract.
+///
+/// This contract manages pension schemes, allowing for the registration of pensioners,
+/// companies, banks, and tax offices. It handles employment updates, insurance additions,
+/// tax configurations, pension payout estimations, payout initiation, and death benefit processing.
+///
+/// Key functionalities include:
+/// - Role-based access control for different operations (contract owner, authorized companies, banks, tax offices).
+/// - Secure storage of pensioner data, insurance details, and tax configurations.
+/// - Calculation of pension amounts based on employment history, salary, and additional insurances, adjusted for taxes.
+/// - Management of pension payout lifecycle, including eligibility checks and death benefit distribution.
 #[ink::contract]
 pub mod pension_manager {
     use ink::prelude::vec::Vec;
@@ -9,73 +20,114 @@ pub mod pension_manager {
     use ink::env::AccountId;
     use ink::env::Balance;
 
-    /// Custom error types for the PensionManager contract.
+    /// Custom error types for the `PensionManager` contract.
+    /// These errors are returned by callable messages to indicate failure conditions.
     #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum Error {
+        /// Caller is not authorized to perform the action.
         Unauthorized,
+        /// The entity (e.g., company, bank) is already registered.
         AlreadyRegistered,
+        /// The entity (e.g., company, bank) is not registered.
         NotRegistered,
+        /// The specified pensioner was not found in the records.
         PensionerNotFound,
-        InvalidInput, // For invalid parameters like tax rate > 100
-        PayoutNotApplicable, // For cases like deceased pensioner for payout calculation
-        NotYetEligibleForPayout, // If pensioner is not yet eligible by age (or other criteria)
-        AlreadyDeceased, // If trying to report death for an already deceased pensioner
+        /// An input parameter was invalid (e.g., tax rate > 100).
+        InvalidInput,
+        /// The requested payout operation is not applicable (e.g., pensioner is deceased or already receiving).
+        PayoutNotApplicable,
+        /// The pensioner is not yet eligible for payout (e.g., by age or other criteria).
+        NotYetEligibleForPayout,
+        /// Attempted to report death for a pensioner who is already marked as deceased.
+        AlreadyDeceased,
     }
 
-    /// Enum defining the employment status of a pensioner.
+    /// Defines the employment status of a pensioner.
     #[derive(Debug, PartialEq, Eq, Clone, Copy, scale::Encode, scale::Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum EmploymentStatus {
+        /// Pensioner is actively employed.
         Active,
+        /// Pensioner is on a long-term pause from employment.
         LongTermPause,
+        /// Pensioner has been laid off.
         LaidOff,
     }
 
-    /// Struct holding data for a pensioner.
+    /// Holds detailed information about a pensioner.
+    /// This struct is stored in the `pensioners` mapping.
     #[derive(Debug, PartialEq, Eq, Clone, scale::Encode, scale::Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     pub struct PensionerData {
+        /// Total number of years the pensioner has worked.
         pub years_worked: u32,
+        /// Current or last known salary of the pensioner.
         pub current_salary: Balance,
+        /// Current employment status of the pensioner.
         pub status: EmploymentStatus,
+        /// Flag indicating if the pensioner is deceased.
         pub is_deceased: bool,
+        /// Flag indicating if the pensioner is currently receiving pension payouts.
         pub is_receiving_pension: bool,
+        /// Flag indicating if the pensioner meets age-based (or other) criteria for payout eligibility.
         pub is_eligible_for_payout_age_wise: bool, 
+        /// The calculated and approved pension payout amount per period, if initiated.
         pub pension_payout_amount: Option<Balance>, 
+        /// Optional `AccountId` of a designated spouse beneficiary for death benefits.
         pub spouse_beneficiary: Option<AccountId>,
     }
 
-    /// Struct holding information about a bank or insurance provider for a pensioner.
+    /// Holds information about a bank or insurance provider for a specific pensioner.
+    /// This includes details about additional insurance payouts.
     #[derive(Debug, PartialEq, Eq, Clone, scale::Encode, scale::Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct BankInsuranceInfo {
+        /// `AccountId` of the bank or insurance provider.
         pub bank_id: AccountId,
+        /// Additional payout amount per period from this insurance.
         pub insurance_payout_per_period: Balance,
+        /// Descriptive details about the insurance policy.
         pub details: String,
     }
 
-    /// Struct holding information about a tax office relevant to a pensioner.
+    /// Holds tax configuration information for a specific pensioner, applied by a tax office.
     #[derive(Debug, PartialEq, Eq, Clone, scale::Encode, scale::Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct TaxOfficeInfo {
+        /// `AccountId` of the tax office that applied this configuration.
         pub tax_office_id: AccountId,
+        /// Tax rate percentage (0-100) to be applied to the pensioner's payout.
         pub tax_rate_percentage: u8,
     }
 
+    /// Main storage struct for the `PensionManager` contract.
+    /// Contains all persistent data of the pension system.
     #[ink(storage)]
     pub struct PensionManager {
+        /// Mapping from a pensioner's `AccountId` to their `PensionerData`.
         pub pensioners: Mapping<AccountId, PensionerData>,
+        /// Mapping to store authorized company `AccountId`s. Presence indicates authorization.
         pub company_authorizations: Mapping<AccountId, ()>,
+        /// Mapping to store authorized bank `AccountId`s.
         pub bank_authorizations: Mapping<AccountId, ()>,
+        /// Mapping to store authorized tax office `AccountId`s.
         pub tax_office_authorizations: Mapping<AccountId, ()>,
+        /// Mapping from a pensioner's `AccountId` to a list of their `BankInsuranceInfo`.
         pub pensioner_insurances: Mapping<AccountId, Vec<BankInsuranceInfo>>,
+        /// Mapping from a pensioner's `AccountId` to their `TaxOfficeInfo`.
         pub pensioner_tax_config: Mapping<AccountId, TaxOfficeInfo>,
-        pub spouse_death_benefits: Mapping<AccountId, Balance>, // New
+        /// Mapping from a spouse beneficiary's `AccountId` to their calculated death benefit amount.
+        pub spouse_death_benefits: Mapping<AccountId, Balance>,
+        /// The `AccountId` of the contract owner, set at deployment.
         pub contract_owner: AccountId,
     }
 
     impl PensionManager {
+        /// Constructor: Initializes a new instance of the `PensionManager` contract.
+        ///
+        /// Sets the caller of this constructor as the `contract_owner`.
+        /// Initializes all storage mappings to be empty.
         #[ink(constructor)]
         pub fn new() -> Self {
             Self {
@@ -91,8 +143,10 @@ pub mod pension_manager {
         }
 
         // --- Private Helper for Payout Calculation ---
+        /// Internal helper to calculate the gross pension amount before tax, including base and insurances.
+        /// This is not directly callable but used by `get_my_future_payout` and `initiate_pension_payout`.
         fn _calculate_pension_amount(&self, pensioner_data: &PensionerData, pensioner_id: &AccountId) -> Result<Balance, Error> {
-            if pensioner_data.is_deceased { // Should be checked by caller, but good safeguard
+            if pensioner_data.is_deceased { // Safeguard, should ideally be checked by calling logic
                 return Err(Error::PayoutNotApplicable);
             }
 
@@ -170,6 +224,16 @@ pub mod pension_manager {
         }
 
         // --- Registration / Unregistration Messages (Owner Only) ---
+        /// Registers a new company.
+        ///
+        /// Only the `contract_owner` can call this message.
+        ///
+        /// # Arguments
+        /// * `company_id`: The `AccountId` of the company to register.
+        ///
+        /// # Errors
+        /// * `Error::Unauthorized` if the caller is not the contract owner.
+        /// * `Error::AlreadyRegistered` if the company is already registered.
         #[ink(message)]
         pub fn register_company(&mut self, company_id: AccountId) -> Result<(), Error> {
             self.ensure_owner()?;
@@ -180,6 +244,16 @@ pub mod pension_manager {
             Ok(())
         }
 
+        /// Unregisters an existing company.
+        ///
+        /// Only the `contract_owner` can call this message.
+        ///
+        /// # Arguments
+        /// * `company_id`: The `AccountId` of the company to unregister.
+        ///
+        /// # Errors
+        /// * `Error::Unauthorized` if the caller is not the contract owner.
+        /// * `Error::NotRegistered` if the company is not currently registered.
         #[ink(message)]
         pub fn unregister_company(&mut self, company_id: AccountId) -> Result<(), Error> {
             self.ensure_owner()?;
@@ -190,6 +264,16 @@ pub mod pension_manager {
             Ok(())
         }
 
+        /// Registers a new bank.
+        ///
+        /// Only the `contract_owner` can call this message.
+        ///
+        /// # Arguments
+        /// * `bank_id`: The `AccountId` of the bank to register.
+        ///
+        /// # Errors
+        /// * `Error::Unauthorized` if the caller is not the contract owner.
+        /// * `Error::AlreadyRegistered` if the bank is already registered.
         #[ink(message)]
         pub fn register_bank(&mut self, bank_id: AccountId) -> Result<(), Error> {
             self.ensure_owner()?;
@@ -199,6 +283,17 @@ pub mod pension_manager {
             self.bank_authorizations.insert(bank_id, &());
             Ok(())
         }
+
+        /// Unregisters an existing bank.
+        ///
+        /// Only the `contract_owner` can call this message.
+        ///
+        /// # Arguments
+        /// * `bank_id`: The `AccountId` of the bank to unregister.
+        ///
+        /// # Errors
+        /// * `Error::Unauthorized` if the caller is not the contract owner.
+        /// * `Error::NotRegistered` if the bank is not currently registered.
 
         #[ink(message)]
         pub fn unregister_bank(&mut self, bank_id: AccountId) -> Result<(), Error> {
@@ -210,6 +305,16 @@ pub mod pension_manager {
             Ok(())
         }
 
+        /// Registers a new tax office.
+        ///
+        /// Only the `contract_owner` can call this message.
+        ///
+        /// # Arguments
+        /// * `tax_office_id`: The `AccountId` of the tax office to register.
+        ///
+        /// # Errors
+        /// * `Error::Unauthorized` if the caller is not the contract owner.
+        /// * `Error::AlreadyRegistered` if the tax office is already registered.
         #[ink(message)]
         pub fn register_tax_office(&mut self, tax_office_id: AccountId) -> Result<(), Error> {
             self.ensure_owner()?;
@@ -219,6 +324,17 @@ pub mod pension_manager {
             self.tax_office_authorizations.insert(tax_office_id, &());
             Ok(())
         }
+
+        /// Unregisters an existing tax office.
+        ///
+        /// Only the `contract_owner` can call this message.
+        ///
+        /// # Arguments
+        /// * `tax_office_id`: The `AccountId` of the tax office to unregister.
+        ///
+        /// # Errors
+        /// * `Error::Unauthorized` if the caller is not the contract owner.
+        /// * `Error::NotRegistered` if the tax office is not currently registered.
 
         #[ink(message)]
         pub fn unregister_tax_office(&mut self, tax_office_id: AccountId) -> Result<(), Error> {
@@ -231,6 +347,23 @@ pub mod pension_manager {
         }
 
         // --- Pensioner Data Update Message (Registered Companies Only) ---
+
+        /// Updates the employment details for a given pensioner.
+        ///
+        /// Only an authorized company can call this message.
+        /// If the `pensioner_id` does not exist, a new record is created with default values
+        /// for `is_deceased`, `is_receiving_pension`, `is_eligible_for_payout_age_wise`,
+        /// `pension_payout_amount`, and `spouse_beneficiary`.
+        ///
+        /// # Arguments
+        /// * `pensioner_id`: The `AccountId` of the pensioner to update.
+        /// * `years_worked`: The new total years worked.
+        /// * `current_salary`: The new current salary.
+        /// * `status`: The new `EmploymentStatus`.
+        ///
+        /// # Errors
+        /// * `Error::Unauthorized` if the caller is not an authorized company.
+              
         #[ink(message)]
         pub fn update_pensioner_employment(
             &mut self,
@@ -265,6 +398,32 @@ pub mod pension_manager {
         }
 
         // --- Bank and Tax Office Messages ---
+
+        /// Adds a pension insurance record for a specified pensioner.
+        ///
+        /// Only an authorized bank can call this message.
+        /// The insurance details are added to the pensioner's list of insurances.
+        ///
+        /// # Arguments
+        /// * `pensioner_id`: The `AccountId` of the pensioner.
+        /// * `insurance_payout_per_period`: The payout amount per period for this insurance.
+        /// * `details`: A string describing the insurance policy.
+        ///
+        /// # Errors
+        /// * `Error::Unauthorized` if the caller is not an authorized bank.
+        /// * `Error::PensionerNotFound` if the `pensioner_id` does not exist.
+        /// Applies or updates the pension tax rate for a specified pensioner.
+        ///
+        /// Only an authorized tax office can call this message.
+        ///
+        /// # Arguments
+        /// * `pensioner_id`: The `AccountId` of the pensioner.
+        /// * `tax_rate_percentage`: The tax rate (0-100) to apply.
+        ///
+        /// # Errors
+        /// * `Error::Unauthorized` if the caller is not an authorized tax office.
+        /// * `Error::PensionerNotFound` if the `pensioner_id` does not exist.
+        /// * `Error::InvalidInput` if `tax_rate_percentage` is greater than 100.
         #[ink(message)]
         pub fn add_pension_insurance(
             &mut self,
@@ -317,21 +476,42 @@ pub mod pension_manager {
         }
 
         // --- Pensioner-Callable Messages ---
-        #[ink(message)]
-            Ok(())
-        }
 
-        // --- Pensioner-Callable Messages ---
-
+        /// Sets the age-based eligibility status for a pensioner.
+        ///
+        /// Only the `contract_owner` can call this message.
+        /// This is a simplified mechanism for age verification; a real system might use oracles.
+        ///
+        /// # Arguments
+        /// * `pensioner_id`: The `AccountId` of the pensioner.
+        /// * `is_eligible`: Boolean flag indicating if the pensioner is age-eligible.
+        ///
+        /// # Errors
+        /// * `Error::Unauthorized` if the caller is not the contract owner.
+        /// * `Error::PensionerNotFound` if the `pensioner_id` does not exist.
         #[ink(message)]
         pub fn set_age_eligibility_status(&mut self, pensioner_id: AccountId, is_eligible: bool) -> Result<(), Error> {
-            self.ensure_owner()?; // Or a company, for now owner
+            self.ensure_owner()?;
             let mut pensioner_data = self.pensioners.get_mut(&pensioner_id).ok_or(Error::PensionerNotFound)?;
             pensioner_data.is_eligible_for_payout_age_wise = is_eligible;
             self.pensioners.insert(pensioner_id, &pensioner_data);
             Ok(())
         }
 
+        /// Allows a pensioner (the caller) to initiate their pension payout.
+        ///
+        /// The pensioner must exist, not be deceased, not already be receiving pension,
+        /// and be marked as `is_eligible_for_payout_age_wise`.
+        /// The calculated pension amount is stored, and `is_receiving_pension` is set to true.
+        ///
+        /// # Returns
+        /// The calculated `Balance` of the pension payout per period on success.
+        ///
+        /// # Errors
+        /// * `Error::PensionerNotFound` if the caller is not a registered pensioner.
+        /// * `Error::PayoutNotApplicable` if the pensioner is deceased or already receiving pension.
+        /// * `Error::NotYetEligibleForPayout` if `is_eligible_for_payout_age_wise` is false.
+        /// * `Error::InvalidInput` if there's an issue with stored tax data (e.g., rate > 100).
         #[ink(message)]
         pub fn initiate_pension_payout(&mut self) -> Result<Balance, Error> {
             let caller = self.env().caller();
@@ -353,6 +533,17 @@ pub mod pension_manager {
             Ok(calculated_payout)
         }
 
+        /// Allows a pensioner (the caller) to designate a spouse as a beneficiary.
+        ///
+        /// The pensioner must exist and not be deceased.
+        ///
+        /// # Arguments
+        /// * `spouse_id`: The `AccountId` of the spouse to be designated.
+        ///
+        /// # Errors
+        /// * `Error::PensionerNotFound` if the caller is not a registered pensioner.
+        /// * `Error::PayoutNotApplicable` if the pensioner is deceased.
+
         #[ink(message)]
         pub fn designate_spouse_beneficiary(&mut self, spouse_id: AccountId) -> Result<(), Error> {
             let caller = self.env().caller();
@@ -367,6 +558,24 @@ pub mod pension_manager {
             Ok(())
         }
         
+        /// Reports the death of a pensioner and assigns death benefits if a spouse is designated.
+        ///
+        /// This message can be called by anyone.
+        /// It marks the pensioner as deceased, stops any ongoing pension, and if a spouse beneficiary
+        /// is set, calculates a 20% death benefit based on the pensioner's last calculated payout potential
+        /// and stores it for the spouse.
+        ///
+        /// # Arguments
+        /// * `deceased_pensioner_id`: The `AccountId` of the pensioner who has deceased.
+        ///
+        /// # Returns
+        /// `Ok(Some(Balance))` with the calculated spouse benefit if a spouse was designated,
+        /// `Ok(None)` if no spouse was designated, or an `Error`.
+        ///
+        /// # Errors
+        /// * `Error::PensionerNotFound` if `deceased_pensioner_id` does not exist.
+        /// * `Error::AlreadyDeceased` if the pensioner is already marked as deceased.
+        /// * `Error::InvalidInput` if there's an issue with stored tax data during benefit calculation.
         #[ink(message)]
         pub fn report_death_and_assign_spouse_benefit(&mut self, deceased_pensioner_id: AccountId) -> Result<Option<Balance>, Error> {
             let mut pensioner_data = self.pensioners.get_mut(&deceased_pensioner_id).ok_or(Error::PensionerNotFound)?;
@@ -396,11 +605,23 @@ pub mod pension_manager {
             Ok(assigned_spouse_benefit)
         }
 
+        /// Retrieves the estimated future pension payout for the caller (pensioner).
+        ///
+        /// This is a read-only query. The calculation includes base pension, added insurances,
+        /// and applied taxes.
+        ///
+        /// # Returns
+        /// The estimated `Balance` of the future payout per period on success.
+        ///
+        /// # Errors
+        /// * `Error::PensionerNotFound` if the caller is not a registered pensioner.
+        /// * `Error::PayoutNotApplicable` if the pensioner is deceased.
+        /// * `Error::InvalidInput` if there's an issue with stored tax data (e.g., rate > 100).
         #[ink(message)]
         pub fn get_my_future_payout(&self) -> Result<Balance, Error> {
             let caller = self.env().caller();
             let pensioner_data = self.pensioners.get(&caller).ok_or(Error::PensionerNotFound)?;
-             if pensioner_data.is_deceased { // Add this check also to get_my_future_payout
+             if pensioner_data.is_deceased {
                 return Err(Error::PayoutNotApplicable);
             }
             self._calculate_pension_amount(&pensioner_data, &caller)
@@ -408,40 +629,60 @@ pub mod pension_manager {
 
 
         // --- Getter/Check Messages (Callable by Anyone) ---
+              
+        /// Checks if a given `AccountId` is an authorized company.
         #[ink(message)]
         pub fn is_company_authorized(&self, company_id: AccountId) -> bool {
             self.company_authorizations.contains(&company_id)
         }
+
+        /// Checks if a given `AccountId` is an authorized bank.
 
         #[ink(message)]
         pub fn is_bank_authorized(&self, bank_id: AccountId) -> bool {
             self.bank_authorizations.contains(&bank_id)
         }
 
+        /// Checks if a given `AccountId` is an authorized tax office.
+
         #[ink(message)]
         pub fn is_tax_office_authorized(&self, tax_office_id: AccountId) -> bool {
             self.tax_office_authorizations.contains(&tax_office_id)
         }
+
+        /// Retrieves the `PensionerData` for a given `pensioner_id`.
+        /// Returns `None` if the pensioner is not found.
 
         #[ink(message)]
         pub fn get_pensioner_data(&self, pensioner_id: AccountId) -> Option<PensionerData> {
             self.pensioners.get(&pensioner_id)
         }
 
+        /// Retrieves the list of `BankInsuranceInfo` for a given `pensioner_id`.
+        /// Returns `None` if the pensioner has no insurance records or is not found.
+
         #[ink(message)]
         pub fn get_pensioner_insurances(&self, pensioner_id: AccountId) -> Option<Vec<BankInsuranceInfo>> {
             self.pensioner_insurances.get(&pensioner_id)
         }
+
+        /// Retrieves the `TaxOfficeInfo` for a given `pensioner_id`.
+        /// Returns `None` if no tax configuration is set for the pensioner or if not found.
 
         #[ink(message)]
         pub fn get_pensioner_tax_config(&self, pensioner_id: AccountId) -> Option<TaxOfficeInfo> {
             self.pensioner_tax_config.get(&pensioner_id)
         }
         
+        /// Retrieves the death benefit amount assigned to the caller (spouse beneficiary).
+        /// Returns `None` if the caller has no death benefit assigned.
+
         #[ink(message)]
         pub fn get_my_spouse_death_benefit(&self) -> Option<Balance> {
             self.spouse_death_benefits.get(&self.env().caller())
         }
+
+        /// Retrieves the `AccountId` of the contract owner.
 
         #[ink(message)]
         pub fn get_contract_owner(&self) -> AccountId {
