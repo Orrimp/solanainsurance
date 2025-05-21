@@ -224,7 +224,6 @@ pub mod pension_manager {
         }
 
         // --- Registration / Unregistration Messages (Owner Only) ---
-
         /// Registers a new company.
         ///
         /// Only the `contract_owner` can call this message.
@@ -295,6 +294,7 @@ pub mod pension_manager {
         /// # Errors
         /// * `Error::Unauthorized` if the caller is not the contract owner.
         /// * `Error::NotRegistered` if the bank is not currently registered.
+
         #[ink(message)]
         pub fn unregister_bank(&mut self, bank_id: AccountId) -> Result<(), Error> {
             self.ensure_owner()?;
@@ -335,6 +335,7 @@ pub mod pension_manager {
         /// # Errors
         /// * `Error::Unauthorized` if the caller is not the contract owner.
         /// * `Error::NotRegistered` if the tax office is not currently registered.
+
         #[ink(message)]
         pub fn unregister_tax_office(&mut self, tax_office_id: AccountId) -> Result<(), Error> {
             self.ensure_owner()?;
@@ -362,6 +363,7 @@ pub mod pension_manager {
         ///
         /// # Errors
         /// * `Error::Unauthorized` if the caller is not an authorized company.
+              
         #[ink(message)]
         pub fn update_pensioner_employment(
             &mut self,
@@ -541,6 +543,7 @@ pub mod pension_manager {
         /// # Errors
         /// * `Error::PensionerNotFound` if the caller is not a registered pensioner.
         /// * `Error::PayoutNotApplicable` if the pensioner is deceased.
+
         #[ink(message)]
         pub fn designate_spouse_beneficiary(&mut self, spouse_id: AccountId) -> Result<(), Error> {
             let caller = self.env().caller();
@@ -626,7 +629,7 @@ pub mod pension_manager {
 
 
         // --- Getter/Check Messages (Callable by Anyone) ---
-
+              
         /// Checks if a given `AccountId` is an authorized company.
         #[ink(message)]
         pub fn is_company_authorized(&self, company_id: AccountId) -> bool {
@@ -634,12 +637,14 @@ pub mod pension_manager {
         }
 
         /// Checks if a given `AccountId` is an authorized bank.
+
         #[ink(message)]
         pub fn is_bank_authorized(&self, bank_id: AccountId) -> bool {
             self.bank_authorizations.contains(&bank_id)
         }
 
         /// Checks if a given `AccountId` is an authorized tax office.
+
         #[ink(message)]
         pub fn is_tax_office_authorized(&self, tax_office_id: AccountId) -> bool {
             self.tax_office_authorizations.contains(&tax_office_id)
@@ -647,6 +652,7 @@ pub mod pension_manager {
 
         /// Retrieves the `PensionerData` for a given `pensioner_id`.
         /// Returns `None` if the pensioner is not found.
+
         #[ink(message)]
         pub fn get_pensioner_data(&self, pensioner_id: AccountId) -> Option<PensionerData> {
             self.pensioners.get(&pensioner_id)
@@ -654,6 +660,7 @@ pub mod pension_manager {
 
         /// Retrieves the list of `BankInsuranceInfo` for a given `pensioner_id`.
         /// Returns `None` if the pensioner has no insurance records or is not found.
+
         #[ink(message)]
         pub fn get_pensioner_insurances(&self, pensioner_id: AccountId) -> Option<Vec<BankInsuranceInfo>> {
             self.pensioner_insurances.get(&pensioner_id)
@@ -661,6 +668,7 @@ pub mod pension_manager {
 
         /// Retrieves the `TaxOfficeInfo` for a given `pensioner_id`.
         /// Returns `None` if no tax configuration is set for the pensioner or if not found.
+
         #[ink(message)]
         pub fn get_pensioner_tax_config(&self, pensioner_id: AccountId) -> Option<TaxOfficeInfo> {
             self.pensioner_tax_config.get(&pensioner_id)
@@ -668,12 +676,14 @@ pub mod pension_manager {
         
         /// Retrieves the death benefit amount assigned to the caller (spouse beneficiary).
         /// Returns `None` if the caller has no death benefit assigned.
+
         #[ink(message)]
         pub fn get_my_spouse_death_benefit(&self) -> Option<Balance> {
             self.spouse_death_benefits.get(&self.env().caller())
         }
 
         /// Retrieves the `AccountId` of the contract owner.
+
         #[ink(message)]
         pub fn get_contract_owner(&self) -> AccountId {
             self.contract_owner

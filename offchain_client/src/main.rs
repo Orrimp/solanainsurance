@@ -31,6 +31,7 @@ struct Cli {
     node_url: String,
 
     /// The address of the deployed `pension_manager` smart contract.
+
     #[clap(long, default_value = "5C4hrfjw9DjXZTzV3MwzstNcxkN6odQVsreqgradKZLGHG8L")] // Dummy contract address
     contract_address: String,
 }
@@ -114,6 +115,7 @@ enum Commands {
         /// The AccountId (as a string) of the pensioner.
         pensioner_id: String,
         /// Tax rate percentage (0-100).
+
         rate: u8,
     },
 
