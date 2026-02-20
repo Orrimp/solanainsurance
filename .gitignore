@@ -1,0 +1,15 @@
+/target
+
+# macOS cruft
+.DS_Store
+
+# Solana local validator (ledger) outputs
+/test-ledger/
+/snapshot/
+
+# Limit noisy artifacts within test-ledger
+/test-ledger/**/*.log
+/test-ledger/**/*.bin
+/test-ledger/**/*.sst
+/test-ledger/rocksdb/
+/test-ledger/accounts/
