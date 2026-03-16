@@ -8,15 +8,18 @@ use solana_program::{
     program::invoke,
     program_error::ProgramError,
     pubkey::Pubkey,
-    system_instruction,
     sysvar::{clock::Clock, rent::Rent, Sysvar},
-    log::{sol_log, sol_log_64, sol_log_compute_units, sol_log_data, sol_log_params, sol_log_slice},
 };
+use solana_system_interface::instruction as system_instruction;
+#[cfg(feature = "debug")]
+use solana_program::log::{sol_log, sol_log_params};
+#[cfg(any(feature = "debug", feature = "profile-cu"))]
+use solana_program::log::sol_log_compute_units;
 
 use crate::{
     errors::PensionError,
     instructions::PensionInstruction,
-    state::{PensionAccount, PensionStatus, YearPointsEntry, MAX_POINTS_ENTRIES},
+    state::{PensionAccount, PensionMetaData, PensionStatus, Relations, YearPointsEntry, MAX_POINTS_ENTRIES},
 };
 
 /// Process an instruction for the pension insurance program
@@ -35,7 +38,23 @@ pub fn process_instruction(
     }
 
     let result = match instruction {
-        PensionInstruction::InitializePensioner { pensioner_pubkey, monthly_payment } => process_initialize_pensioner(program_id, accounts, pensioner_pubkey, monthly_payment),
+        PensionInstruction::InitializePensioner {
+            pensioner_pubkey,
+            monthly_payment,
+            date_of_birth,
+            date_of_retirement,
+            metadata,
+            spouse,
+        } => process_initialize_pensioner(
+            program_id,
+            accounts,
+            pensioner_pubkey,
+            monthly_payment,
+            date_of_birth,
+            date_of_retirement,
+            metadata,
+            spouse,
+        ),
         PensionInstruction::MarkDeceased => process_mark_deceased(program_id, accounts),
         PensionInstruction::CalculateDuePayment => process_calculate_due_payment(program_id, accounts),
         PensionInstruction::AddPoints { year, month, points } => process_add_year_month_points(program_id, accounts, year, month, points),
@@ -59,15 +78,30 @@ pub fn process_instruction(
     result
 }
 
-/// Initialize a new pension account for a pensioner
+/// Initialize a new pension account for a pensioner.
+///
+/// Creates a rent-exempt on-chain account owned by this program and populates it with
+/// the supplied profile data. The account is placed in [`PensionStatus::PrePension`]
+/// status — the authority must transition it to `Active` before payment instructions
+/// can operate on it.
+///
+/// # Errors
+/// - [`PensionError::InvalidDateOfBirth`] — `date_of_birth` is 0.
+/// - [`ProgramError::MissingRequiredSignature`] — authority or pension account did not sign.
 pub fn process_initialize_pensioner(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     pensioner_pubkey: Pubkey,
     monthly_payment: u64,
+    date_of_birth: i64,
+    date_of_retirement: i64,
+    metadata: PensionMetaData,
+    spouse: Pubkey,
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_initialize_pensioner");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:InitializePensioner:enter]"); sol_log_compute_units(); }
 
     let accounts_iter = &mut accounts.iter();
     
@@ -82,6 +116,11 @@ pub fn process_initialize_pensioner(
 
     if !pension_account.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
+    }
+
+    // date_of_birth is a permanent identity field and must always be provided.
+    if date_of_birth <= 0 {
+        return Err(PensionError::InvalidDateOfBirth.into());
     }
 
     // Calculate rent
@@ -104,11 +143,17 @@ pub fn process_initialize_pensioner(
         ],
     )?;
 
-    // Initialize the pension account data
+    // Populate the on-chain account. Status is PrePension — the authority transitions
+    // to Active in a separate instruction once the pensioner is eligible.
     let pension_data = PensionAccount {
         authority: *authority_account.key,
         pensioner: pensioner_pubkey,
-        status: PensionStatus::Active,
+        status: PensionStatus::PrePension,
+        date_of_birth,
+        metadata,
+        date_of_retirement,
+        // date_of_death starts at 0 and is only set by MarkDeceased.
+        date_of_death: 0,
         monthly_payment,
         last_payment_timestamp: Clock::get()?.unix_timestamp,
         payout_enabled: 0,
@@ -116,11 +161,12 @@ pub fn process_initialize_pensioner(
         points_count: 0,
         points: [YearPointsEntry { year: 0, month: 0, points: 0 }; MAX_POINTS_ENTRIES],
         total_contributions_lamports: 0,
-        date_of_birth: todo!(),
-        metadata: todo!(),
-        date_of_retirement: todo!(),
-        date_of_death: todo!(),
-        relations: todo!(),
+        // Children are out of scope for initialization; added via a dedicated instruction.
+        relations: Relations {
+            pensioner: pensioner_pubkey,
+            children: vec![],
+            spouse,
+        },
     };
 
     // Serialize the data into the account
@@ -128,8 +174,8 @@ pub fn process_initialize_pensioner(
     pension_data.serialize(&mut account_data)?;
 
     msg!("Initialized new pension account for: {}", pensioner_pubkey);
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:InitializePensioner:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -140,6 +186,8 @@ pub fn process_mark_deceased(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_mark_deceased");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:MarkDeceased:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     
     let pension_account = next_account_info(accounts_iter)?;
@@ -178,8 +226,8 @@ pub fn process_mark_deceased(
         "Pensioner {} marked as deceased. Payments will be stopped.",
         pension_data.pensioner
     );
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:MarkDeceased:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -190,6 +238,8 @@ pub fn process_calculate_due_payment(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_calculate_due_payment");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:CalculateDuePayment:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     
     let pension_account = next_account_info(accounts_iter)?;
@@ -229,8 +279,8 @@ pub fn process_calculate_due_payment(
         msg!("No time has passed since last payment. Due payment: 0 lamports");
     }
 
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:CalculateDuePayment:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -244,6 +294,8 @@ pub fn process_add_year_month_points(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_add_year_month_points");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:AddPoints:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     let pension_account = next_account_info(accounts_iter)?;
     let authority_account = next_account_info(accounts_iter)?;
@@ -264,8 +316,8 @@ pub fn process_add_year_month_points(
     pension_data.points_count += 1;
     pension_data.serialize(&mut &mut data[..])?;
     msg!("Added points year={} month={} points={}", year, month, points);
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:AddPoints:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -277,6 +329,8 @@ pub fn process_get_year_points(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_get_year_points");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:GetPoints:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     let pension_account = next_account_info(accounts_iter)?;
     if pension_account.owner != program_id { return Err(PensionError::IncorrectOwner.into()); }
@@ -285,8 +339,8 @@ pub fn process_get_year_points(
     for i in 0..pension_data.points_count as usize {
         if pension_data.points[i].year == year {
             msg!("Points for year {}: {}", year, pension_data.points[i].points);
-            #[cfg(feature = "debug")]
-            sol_log_compute_units();
+            #[cfg(feature = "profile-cu")]
+            { msg!("[cu:GetPoints:exit]"); sol_log_compute_units(); }
             return Ok(());
         }
     }
@@ -300,6 +354,8 @@ pub fn process_get_all_points(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_get_all_points");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:GetAllPoints:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     let pension_account = next_account_info(accounts_iter)?;
     if pension_account.owner != program_id { return Err(PensionError::IncorrectOwner.into()); }
@@ -309,8 +365,8 @@ pub fn process_get_all_points(
     for i in 0..pension_data.points_count as usize {
         msg!("Year: {}, Month: {}, Points: {}", pension_data.points[i].year, pension_data.points[i].month, pension_data.points[i].points);
     }
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:GetAllPoints:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -322,6 +378,8 @@ pub fn process_start_payout(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_start_payout");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:StartPayout:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     let pension_account = next_account_info(accounts_iter)?;
     let authority_account = next_account_info(accounts_iter)?;
@@ -336,8 +394,8 @@ pub fn process_start_payout(
     pension_data.payout_recipient = recipient;
     pension_data.serialize(&mut &mut data[..])?;
     msg!("Payout started to {}", recipient);
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:StartPayout:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -348,6 +406,8 @@ pub fn process_stop_payout(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_stop_payout");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:StopPayout:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     let pension_account = next_account_info(accounts_iter)?;
     let authority_account = next_account_info(accounts_iter)?;
@@ -361,8 +421,8 @@ pub fn process_stop_payout(
     pension_data.payout_recipient = Pubkey::default();
     pension_data.serialize(&mut &mut data[..])?;
     msg!("Payout stopped");
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:StopPayout:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -374,6 +434,8 @@ pub fn process_change_payout_recipient(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_change_payout_recipient");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:ChangePayoutRecipient:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     let pension_account = next_account_info(accounts_iter)?;
     let authority_account = next_account_info(accounts_iter)?;
@@ -387,8 +449,8 @@ pub fn process_change_payout_recipient(
     pension_data.payout_recipient = new_recipient;
     pension_data.serialize(&mut &mut data[..])?;
     msg!("Payout recipient changed to {}", new_recipient);
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:ChangePayoutRecipient:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -401,6 +463,8 @@ pub fn process_recalculate_monthly_from_points(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_recalculate_monthly_from_points");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:RecalculateMonthly:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     let pension_account = next_account_info(accounts_iter)?;
     let authority_account = next_account_info(accounts_iter)?;
@@ -416,8 +480,8 @@ pub fn process_recalculate_monthly_from_points(
     pension_data.monthly_payment = base_lamports.saturating_add(points_component);
     pension_data.serialize(&mut &mut data[..])?;
     msg!("Recalculated monthly payment old={} new={} base={} points_component={} total_points={} point_multiplier={}", old, pension_data.monthly_payment, base_lamports, points_component, total_points, point_multiplier_lamports);
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:RecalculateMonthly:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -431,6 +495,8 @@ pub fn process_contribute(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_contribute");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:Contribute:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     let pension_account = next_account_info(accounts_iter)?;
     let contributor = next_account_info(accounts_iter)?; // authority/org
@@ -460,8 +526,8 @@ pub fn process_contribute(
     }
     state.serialize(&mut &mut data[..])?;
     msg!("Contribution applied lamports={} points={} year={} total_contributions={}", lamports, points, year, state.total_contributions_lamports);
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:Contribute:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -472,6 +538,8 @@ pub fn process_start_payout_period(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_start_payout_period");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:StartPayoutPeriod:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     let pension_account = next_account_info(accounts_iter)?;
     let authority = next_account_info(accounts_iter)?;
@@ -484,8 +552,8 @@ pub fn process_start_payout_period(
     state.payout_enabled = 1;
     state.serialize(&mut &mut data[..])?;
     msg!("Payout period started");
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:StartPayoutPeriod:exit]"); sol_log_compute_units(); }
     Ok(())
 }
 
@@ -496,6 +564,8 @@ pub fn process_withdraw_monthly(
 ) -> ProgramResult {
     #[cfg(feature = "debug")]
     msg!("process_withdraw_monthly");
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:WithdrawMonthly:enter]"); sol_log_compute_units(); }
     let accounts_iter = &mut accounts.iter();
     let pension_account = next_account_info(accounts_iter)?;
     let authority = next_account_info(accounts_iter)?;
@@ -514,7 +584,7 @@ pub fn process_withdraw_monthly(
     state.last_payment_timestamp = Clock::get()?.unix_timestamp;
     state.serialize(&mut &mut data[..])?;
     msg!("Monthly payout simulated amount={} remaining_contributions={}", state.monthly_payment, state.total_contributions_lamports);
-    #[cfg(feature = "debug")]
-    sol_log_compute_units();
+    #[cfg(feature = "profile-cu")]
+    { msg!("[cu:WithdrawMonthly:exit]"); sol_log_compute_units(); }
     Ok(())
 }

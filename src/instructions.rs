@@ -3,20 +3,36 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::pubkey::Pubkey;
 
+use crate::state::PensionMetaData;
+
 /// Instructions that the pension insurance program can execute
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub enum PensionInstruction {
-    /// Initialize a new pension account for a pensioner
-    /// 
-    /// Accounts expected:
-    /// 0. `[writable, signer]` Pension account to initialize
+    /// Initialize a new pension account for a pensioner.
+    ///
+    /// The account is created in `PrePension` status. The authority must transition it
+    /// to `Active` via a separate instruction before payments can be processed.
+    ///
+    /// # Accounts expected
+    /// 0. `[writable, signer]` Pension account to initialize (new, unallocated keypair)
     /// 1. `[signer]` Authority (insurance company/DAO)
     /// 2. `[]` System program
+    ///
+    /// # Errors
+    /// Returns [`crate::errors::PensionError::InvalidDateOfBirth`] if `date_of_birth` is 0.
     InitializePensioner {
-        /// The public key of the pensioner
+        /// The public key of the pensioner's wallet.
         pensioner_pubkey: Pubkey,
-        /// Monthly payment amount in lamports
+        /// Initial monthly payment amount in lamports.
         monthly_payment: u64,
+        /// Pensioner's date of birth as a Unix timestamp. **Must be > 0.**
+        date_of_birth: i64,
+        /// Expected retirement date as a Unix timestamp. Pass `0` if not yet determined.
+        date_of_retirement: i64,
+        /// Pension plan configuration. Pass `PensionMetaData::default()` if not yet configured.
+        metadata: PensionMetaData,
+        /// Pensioner's spouse account. Pass `Pubkey::default()` if none.
+        spouse: Pubkey,
     },
 
     /// Mark a pensioner as deceased to stop payments

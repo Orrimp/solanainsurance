@@ -1,21 +1,22 @@
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{
-    commitment_config::CommitmentConfig,
-    instruction::Instruction,
-    pubkey::Pubkey,
-    signature::{Keypair, Signer},
-    transaction::Transaction,
-};
-use std::{env, str::FromStr, thread::sleep, time::Duration};
+use solana_rpc_client::rpc_client::RpcClient;
+use solana_commitment_config::CommitmentConfig;
+use solana_instruction::Instruction;
+use solana_address::Address as Pubkey;
+use solana_keypair::Keypair;
+use solana_signer::Signer;
+use solana_transaction::Transaction;
+use std::{str::FromStr, thread::sleep, time::Duration};
 
 fn main() {
-    // Resolve program id from env or fallback to a known default
-    let program_id = env::var("PROGRAM_ID")
+    // Resolve program id: PROGRAM_ID env var, then deploy keypair, then panic.
+    let program_id = std::env::var("PROGRAM_ID")
         .ok()
         .and_then(|s| Pubkey::from_str(&s).ok())
         .unwrap_or_else(|| {
-            Pubkey::from_str("B4yfzKC4NsUsYCetguU7tiewFWi8EDrQA9fEJFiYagVw")
-                .expect("Fallback PROGRAM_ID must be valid")
+            let path = "target/deploy/insurance-keypair.json";
+            solana_keypair::read_keypair_file(path)
+                .unwrap_or_else(|e| panic!("Cannot read {path}: {e}.  Run `cargo build-sbf` first."))
+                .pubkey()
         });
     println!("Using Program ID: {}", program_id);
 

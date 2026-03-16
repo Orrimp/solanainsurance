@@ -1,15 +1,17 @@
 use anyhow::Result;
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{
-    instruction::Instruction,
-    signature::{Keypair, Signer},
-    transaction::Transaction,
-};
+use solana_rpc_client::rpc_client::RpcClient;
+use solana_instruction::Instruction;
+use solana_keypair::Keypair;
+use solana_signer::Signer;
+use solana_transaction::Transaction;
+use solana_signature::Signature;
 
 pub struct TxCost {
-    pub signature: solana_sdk::signature::Signature,
+    pub signature: Signature,
     pub fee_lamports: u64,
-    pub compute_units: Option<u64>,
+    /// Compute units consumed as reported by the RPC simulation.
+    /// Reflects what the live validator will charge — use this for capacity planning.
+    pub compute_units_consumed: Option<u64>,
 }
 
 /// Send instructions, returning signature, fee and optional compute units (from simulation).
@@ -39,6 +41,6 @@ pub fn send_instructions(
     Ok(TxCost {
         signature,
         fee_lamports,
-        compute_units,
+        compute_units_consumed: compute_units,
     })
 }

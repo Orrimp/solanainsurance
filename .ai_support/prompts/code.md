@@ -1,0 +1,2 @@
+Implement the defined tasks according to the technical solution.
+Produce clean, well-structured, and tested code. Add meaningful comments where appropriate. Strictly adhere to the acceptance criteria and defined requirements.

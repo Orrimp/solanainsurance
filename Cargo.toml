@@ -4,13 +4,20 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-solana-program = "2.3.0"
-solana-system-interface = "3.0.0"
+solana-program = "3.0.0"
+solana-system-interface = { version = "2", features = ["bincode"] }
 borsh = "1.0"
 thiserror = "1.0"
 arrayref = "0.3.7"
 digest = "0.10.7"
-blake3 = "1.5.1"
+# Pin blake3 and base64ct below versions that use `edition = "2024"` in their
+# manifests. cargo build-sbf uses platform-tools v1.51 (Cargo 1.84.0) which
+# doesn't support the `edition2024` Cargo feature (stabilised in Cargo 1.85).
+#   blake3 >= 1.8.3  → pulls constant_time_eq 0.4.2 (edition 2024)
+#   base64ct >= 1.8  → uses edition 2024 directly
+#   Chain: solana-secp256k1-recover → k256 → ecdsa → spki → base64ct
+blake3 = ">=1.5.1, <1.8.3"
+base64ct = ">=1.7, <1.8"
 
 [build]
 incremental = true
@@ -23,10 +30,23 @@ name =  "client"
 path =  "client/client.rs"
 
 [dev-dependencies]
-litesvm = "0.7.1"
-solana-client = "2.3.0"
-solana-sdk = "2.3.1"
+litesvm = "0.10.0"
+solana-rpc-client = "3"
+solana-commitment-config = "3"
+solana-signature = "3"
+solana-instruction = "3"
+solana-keypair = "3.1.2"
+solana-transaction = "3.1.0"
+solana-message = "3.1.0"
+solana-address = "2.3.0"
+solana-signer = "3.0.0"
+solana-transaction-error = "3.1.0"
+solana-instruction-error = "2.2.0"
 anyhow = "1.0"
 
 [features]
 debug = []
+# Activates entry+exit sol_log_compute_units() brackets in every handler.
+# Diff of the two remaining-CU values = CUs consumed by that handler.
+# Do NOT enable in production builds (each checkpoint costs ~200 CU).
+profile-cu = []

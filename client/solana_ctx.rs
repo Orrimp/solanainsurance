@@ -1,12 +1,21 @@
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signature::{Keypair, Signer}};
+use solana_rpc_client::rpc_client::RpcClient;
+use solana_commitment_config::CommitmentConfig;
+use solana_address::Address as Pubkey;
+use solana_keypair::Keypair;
+use solana_signer::Signer;
 use std::{env, str::FromStr, thread::sleep, time::Duration};
 
 pub fn resolve_program_id() -> Pubkey {
-    env::var("PROGRAM_ID")
-        .ok()
-        .and_then(|s| Pubkey::from_str(&s).ok())
-        .unwrap_or_else(|| Pubkey::from_str("B4yfzKC4NsUsYCetguU7tiewFWi8EDrQA9fEJFiYagVw").expect("valid fallback"))
+    // 1. Explicit override via environment variable.
+    if let Some(pk) = env::var("PROGRAM_ID").ok().and_then(|s| Pubkey::from_str(&s).ok()) {
+        return pk;
+    }
+    // 2. Derive from the deploy keypair so the client always targets the program
+    //    that was last built, regardless of which validator run it lives on.
+    let keypair_path = "target/deploy/insurance-keypair.json";
+    solana_keypair::read_keypair_file(keypair_path)
+        .unwrap_or_else(|e| panic!("Cannot read {keypair_path}: {e}.  Run `cargo build-sbf` first."))
+        .pubkey()
 }
 
 pub fn create_client() -> RpcClient {

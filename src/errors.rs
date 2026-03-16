@@ -36,6 +36,9 @@ pub enum PensionError {
     /// Payout not active
     #[error("Payout not active")]
     PayoutNotActive,
+    /// Date of birth must be a positive Unix timestamp (> 0)
+    #[error("Date of birth must be a positive Unix timestamp")]
+    InvalidDateOfBirth,
 }
 
 impl From<PensionError> for ProgramError {
