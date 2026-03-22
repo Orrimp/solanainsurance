@@ -273,11 +273,6 @@ For detailed analysis, use the [toolbox-pipeline-report.md](./templates/toolbox-
 2. Fill template placeholders with extracted values
 3. Include relevant sections (test results, deploy info, etc.)
 
-**Option 3: Legacy Format**
-
-For backward compatibility, use [pipeline-report.md](./templates/pipeline-report.md), though this
-is more verbose than the toolbox output.
-
 ### Common Failure Scenarios
 
 **Build Failure:**
@@ -374,14 +369,14 @@ You need to fund the account in the test setup.
 
 ## Migration from Shell Script
 
-The shell script [run_pipeline.sh](./scripts/run_pipeline.sh) is **deprecated** and can be removed.
-All functionality has been moved into the Rust-based toolbox:
+Legacy shell workflow has been removed.
+Use the Rust-based toolbox pipeline command for all CI/CD operations:
 
-| Shell Script | Toolbox Equivalent |
-|--------------|-------------------|
-| `bash run_pipeline.sh --check` | `solana-toolbox pipeline --check` |
-| `bash run_pipeline.sh --all` | `solana-toolbox pipeline --all` |
-| `bash run_pipeline.sh --validator-timeout 60` | `solana-toolbox pipeline --validator-timeout 60` |
+| Workflow | Toolbox Command |
+|----------|-----------------|
+| Check only | `solana-toolbox pipeline --check` |
+| Full pipeline | `solana-toolbox pipeline --all` |
+| Custom validator timeout | `solana-toolbox pipeline --validator-timeout 60` |
 
 **Benefits of toolbox:**
 - ✅ Cross-platform (Windows, Linux, macOS)

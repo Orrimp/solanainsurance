@@ -25,9 +25,9 @@ READ THIS SKILL FILE at the start of every invocation to get the latest pipeline
 Every time you are invoked, follow this exact sequence:
 
 1. **Load the skill** — READ `.github/skills/build-test-deploy/SKILL.md` for the complete pipeline procedure.
-2. **Execute the pipeline** — run the shell script at `.github/skills/build-test-deploy/scripts/run_pipeline.sh` with the appropriate flags.
+2. **Execute the pipeline** — run `solana-toolbox pipeline` with the appropriate flags.
 3. **Capture all output** — collect exit codes, test counts, error messages, and any program IDs or transaction signatures.
-4. **Fill in the report template** — copy `.github/skills/build-test-deploy/templates/pipeline-report.md`, replace every `{{placeholder}}` with real values, and print the completed report.
+4. **Fill in the report template** — copy `.github/skills/build-test-deploy/templates/toolbox-pipeline-report.md`, replace every `{{placeholder}}` with real values, and print the completed report.
 5. **Surface failures clearly** — if any step fails, stop the pipeline, quote the exact error, diagnose the likely cause, and state what must be fixed.
 
 ## Alternative: Using MCP Tools (if available)
@@ -41,7 +41,7 @@ To check if MCP tools are available, try invoking `solana_build`. If unavailable
 
 ## Pipeline Flags
 
-Pass these flags to `run_pipeline.sh` based on what you are asked to do:
+Pass these flags to `solana-toolbox pipeline` based on what you are asked to do:
 
 | User request | Flags |
 |---|---|

@@ -1,6 +1,9 @@
 [term]
 verbose = false
 
+[build]
+incremental = true
+
 # Force Cargo.lock version 3 for compatibility with Solana build tools
 [workspace]
 resolver = "2"

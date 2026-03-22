@@ -13,3 +13,11 @@
 /test-ledger/**/*.sst
 /test-ledger/rocksdb/
 /test-ledger/accounts/
+
+# Additional local validator outputs
+/.validator-ledger/
+/.validator-ledger-verbose/
+
+# Local scratch/test directories
+/.link-test/
+/.symlink-test/
