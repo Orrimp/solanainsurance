@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "solana-insurance": {
+      "type": "stdio",
+      "command": "${workspaceFolder}/target/release/solana-mcp-server",
+      "args": [],
+      "env": {
+        "RUST_LOG": "debug"
+      }
+    }
+  }
+}

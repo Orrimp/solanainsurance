@@ -1,0 +1,19 @@
+// Template for adding a new instruction variant to src/instructions.rs
+//
+// Replace placeholders:
+// - {{INSTRUCTION_NAME}}: PascalCase name (e.g., InitializePensioner)
+// - {{INSTRUCTION_COMMENT}}: Description of what this instruction does
+// - {{DATA_FIELDS}}: Optional Borsh-serializable data fields
+//
+// Usage: Add this variant to the InsuranceInstruction enum
+
+/// {{INSTRUCTION_COMMENT}}
+///
+/// # Accounts expected:
+///
+/// 0. `[writable, signer]` authority - Account authorizing this action
+/// 1. `[writable]` target_account - Account to modify
+/// 2. `[]` system_program - System program
+{{INSTRUCTION_NAME}} {
+    {{DATA_FIELDS}}
+},

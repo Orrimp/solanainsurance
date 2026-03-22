@@ -1,0 +1,10 @@
+[term]
+verbose = false
+
+# Force Cargo.lock version 3 for compatibility with Solana build tools
+[workspace]
+resolver = "2"
+
+# Use v3 lock file format (compatible with older Cargo versions used by Solana)
+[unstable]
+# lockfile-v4 = false

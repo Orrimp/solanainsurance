@@ -1,0 +1,50 @@
+// Template for adding a processor handler in src/processor.rs
+//
+// Replace placeholders:
+// - {{INSTRUCTION_NAME}}: PascalCase name matching instruction enum
+// - {{function_name}}: snake_case function name (e.g., process_initialize_pensioner)
+// - {{INSTRUCTION_COMMENT}}: Description
+// - {{ACCOUNT_DOCS}}: Documentation for expected accounts
+// - {{VALIDATE_ACCOUNTS}}: Account validation logic
+// - {{BUSINESS_LOGIC}}: Core instruction logic
+//
+// Usage: Add this function to src/processor.rs and call from process_instruction
+
+/// {{INSTRUCTION_COMMENT}}
+///
+/// # Accounts expected:
+///
+{{ACCOUNT_DOCS}}
+///
+/// # Errors
+///
+/// Returns `ProgramError` if:
+/// - Account validation fails
+/// - Insufficient permissions
+/// - Invalid data provided
+pub fn {{function_name}}(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+) -> ProgramResult {
+    msg!("[insurance][{{function_name}}] Starting");
+
+    // Parse accounts
+    let account_info_iter = &mut accounts.iter();
+    let authority_info = next_account_info(account_info_iter)?;
+    let target_info = next_account_info(account_info_iter)?;
+    
+    // Validate accounts
+    {{VALIDATE_ACCOUNTS}}
+    
+    // Verify authority is signer
+    if !authority_info.is_signer {
+        msg!("[insurance][{{function_name}}] Error: authority must sign");
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+
+    // Business logic
+    {{BUSINESS_LOGIC}}
+
+    msg!("[insurance][{{function_name}}] Success");
+    Ok(())
+}

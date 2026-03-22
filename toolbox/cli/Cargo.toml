@@ -1,0 +1,20 @@
+[package]
+name = "solana-toolbox"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+colored = "2.1"
+serde = { version = "1.0", features = ["derive"] }
+regex = "1.10"
+chrono = "0.4"
+
+[lib]
+name = "solana_toolbox"
+path = "src/lib.rs"
+
+[[bin]]
+name = "solana-toolbox"
+path = "src/main.rs"

@@ -1,6 +1,29 @@
-# Work wit it
+# Solana Insurance Program
 
-We need keys, program and some building.
+Native Solana on-chain program for pension/insurance management with AI-accelerated development toolbox.
+
+## 🚀 Quick Links
+
+- **[AI Toolbox Quick Start](toolbox/QUICKSTART.md)** - Get started with AI-assisted development
+- **[Toolbox Documentation](toolbox/README.md)** - Full toolbox guide
+- **[AGENTS.md](AGENTS.md)** - Architecture guidelines for AI development
+- **[Build-Test-Deploy Skill](.github/skills/build-test-deploy/SKILL.md)** - CI pipeline
+
+## 🧰 AI Development Toolbox
+
+This project includes an AI-first development toolbox for accelerating feature development:
+
+- **MCP Server** - Model Context Protocol server for AI agents (Claude, Cursor)
+- **CLI Tool** - `solana-toolbox` command-line interface
+- **Templates** - Code scaffolding for instructions, tests, processors
+- **Validators** - Architecture compliance checking
+- **Scripts** - Automation for common workflows
+
+**Get started:** See [toolbox/QUICKSTART.md](toolbox/QUICKSTART.md)
+
+---
+
+## 🛠️ Development Setup
 
 ## Run a local validator (local devnet)
 

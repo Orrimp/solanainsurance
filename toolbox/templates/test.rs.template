@@ -1,0 +1,51 @@
+// Template for a LiteSVM test
+//
+// Replace placeholders:
+// - {{test_name}}: snake_case test name
+// - {{TEST_DESCRIPTION}}: What this test verifies
+// - {{INSTRUCTION_NAME}}: Instruction being tested
+// - {{SETUP_CODE}}: Test setup (accounts, keypairs)
+// - {{INSTRUCTION_BUILD}}: Build the instruction
+// - {{ASSERTIONS}}: Verify expected state
+//
+// Usage: Add to src/lib.rs #[cfg(test)] mod tests or separate test file
+
+#[test]
+fn {{test_name}}() {
+    // {{TEST_DESCRIPTION}}
+    
+    let mut svm = LiteSvm::new();
+    
+    // Load program
+    let program_id = Pubkey::new_unique();
+    svm.add_program_from_file(
+        program_id,
+        "target/deploy/insurance.so",
+    ).expect("Failed to load program");
+    
+    // Setup
+    {{SETUP_CODE}}
+    
+    // Build instruction
+    {{INSTRUCTION_BUILD}}
+    
+    // Execute transaction
+    let tx = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&authority.pubkey()),
+        &[&authority],
+        svm.latest_blockhash(),
+    );
+    
+    let result = svm.send_transaction(tx);
+    
+    // Assert transaction succeeded
+    assert!(
+        result.is_ok(),
+        "Transaction failed: {:?}",
+        result.err()
+    );
+    
+    // Verify state
+    {{ASSERTIONS}}
+}

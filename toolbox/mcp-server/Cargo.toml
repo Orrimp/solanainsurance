@@ -1,0 +1,28 @@
+[package]
+name = "solana-mcp-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# MCP protocol implementation
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+thiserror = "1.0"
+async-trait = "0.1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Solana tooling interaction
+toml = "0.8"
+
+[lib]
+name = "solana_mcp_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "solana-mcp-server"
+path = "src/main.rs"

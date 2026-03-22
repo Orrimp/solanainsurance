@@ -1,0 +1,11 @@
+// Template for adding a new error variant to src/errors.rs
+//
+// Replace placeholders:
+// - {{ERROR_NAME}}: PascalCase error name (e.g., InvalidPaymentAmount)
+// - {{ERROR_MESSAGE}}: Human-readable error description
+//
+// Usage: Add to PensionError enum in src/errors.rs
+
+/// {{ERROR_MESSAGE}}
+#[error("{{ERROR_MESSAGE}}")]
+{{ERROR_NAME}},

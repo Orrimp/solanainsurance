@@ -1,3 +1,11 @@
+[workspace]
+members = [
+    ".",
+    "toolbox/mcp-server",
+    "toolbox/cli",
+]
+resolver = "2"
+
 [package]
 name = "insurance"
 version = "0.1.0"

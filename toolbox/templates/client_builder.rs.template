@@ -1,0 +1,41 @@
+// Template for client instruction builder in client/instructions.rs
+//
+// Replace placeholders:
+// - {{function_name}}: snake_case builder name (e.g., initialize_pensioner)
+// - {{INSTRUCTION_COMMENT}}: What this instruction does
+// - {{PARAMETERS}}: Function parameters with types
+// - {{ACCOUNT_METAS}}: AccountMeta array matching processor order
+// - {{DATA_SERIALIZATION}}: Borsh serialization of instruction data
+// - {{INSTRUCTION_NAME}}: Enum variant name
+//
+// Usage: Add to client/instructions.rs
+// CRITICAL: Account order MUST match processor exactly
+
+/// {{INSTRUCTION_COMMENT}}
+///
+/// # Arguments
+///
+/// * `program_id` - The insurance program ID
+{{PARAMETERS}}
+///
+/// # Returns
+///
+/// A properly formatted Instruction ready to add to a transaction
+pub fn {{function_name}}(
+    program_id: &Pubkey,
+    // Add other parameters here
+) -> Instruction {
+    let accounts = vec![
+        {{ACCOUNT_METAS}}
+    ];
+
+    let data = InsuranceInstruction::{{INSTRUCTION_NAME}} {
+        {{DATA_SERIALIZATION}}
+    };
+
+    Instruction {
+        program_id: *program_id,
+        accounts,
+        data: borsh::to_vec(&data).unwrap(),
+    }
+}

@@ -1,0 +1,37 @@
+// Template for adding a new state struct in src/state.rs
+//
+// Replace placeholders:
+// - {{STRUCT_NAME}}: PascalCase struct name (e.g., PensionAccount)
+// - {{STRUCT_COMMENT}}: Description of this state
+// - {{FIELDS}}: Borsh-serializable fields with types and docs
+//
+// Usage: Add to src/state.rs
+
+/// {{STRUCT_COMMENT}}
+///
+/// This struct is serialized using Borsh and stored in a Solana account.
+/// Field order and types are critical - changing them breaks existing accounts.
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
+pub struct {{STRUCT_NAME}} {
+    {{FIELDS}}
+}
+
+impl {{STRUCT_NAME}} {
+    /// Calculate the size needed for this account
+    pub fn serialized_size() -> usize {
+        // Create a dummy instance with worst-case sizes
+        let dummy = Self {
+            // Fill with representative data
+        };
+        borsh::to_vec(&dummy).unwrap().len()
+    }
+
+    /// Create a new {{STRUCT_NAME}}
+    pub fn new(
+        // parameters
+    ) -> Self {
+        Self {
+            // initialize fields
+        }
+    }
+}
