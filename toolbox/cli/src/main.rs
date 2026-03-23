@@ -116,7 +116,29 @@ enum ValidateTarget {
 #[derive(Subcommand)]
 enum DeployEnvironment {
     /// Deploy to local validator
-    Local,
+    Local {
+        /// Amount of SOL to airdrop to default keypair
+        #[arg(long, default_value = "2")]
+        airdrop: u64,
+        /// Keep validator running after command exits
+        #[arg(long)]
+        keep_validator: bool,
+        /// Skip building the program before deploy
+        #[arg(long)]
+        skip_build: bool,
+        /// Skip running example client after deploy
+        #[arg(long)]
+        skip_client: bool,
+        /// Validator startup timeout in seconds
+        #[arg(long, default_value = "30")]
+        validator_timeout: u64,
+        /// RPC URL for local deployment
+        #[arg(long, default_value = "http://127.0.0.1:8899")]
+        rpc_url: String,
+        /// Override program .so path
+        #[arg(long)]
+        program_so: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -160,8 +182,24 @@ fn main() -> Result<()> {
             }
         },
         Commands::Deploy { environment } => match environment {
-            DeployEnvironment::Local => {
-                commands::deploy_local()?;
+            DeployEnvironment::Local {
+                airdrop,
+                keep_validator,
+                skip_build,
+                skip_client,
+                validator_timeout,
+                rpc_url,
+                program_so,
+            } => {
+                commands::deploy_local(
+                    airdrop,
+                    keep_validator,
+                    skip_build,
+                    skip_client,
+                    validator_timeout,
+                    &rpc_url,
+                    program_so.as_deref(),
+                )?;
             }
         },
         Commands::Story { action } => match action {

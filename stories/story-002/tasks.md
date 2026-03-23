@@ -1,7 +1,10 @@
 # Story 002 — Technical Task Breakdown
 
 > Derived from: [story.md](story.md)
-> Status: 🔲 TODO
+> Status: ✅ DONE
+
+Implementation note: the checklist below was preserved as a historical delivery plan. The
+required builders and `full_coverage_tests` module are now present in the codebase.
 
 ---
 

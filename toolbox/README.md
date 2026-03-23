@@ -1,63 +1,57 @@
 # Solana Toolbox
 
-AI-powered development toolbox for Solana on-chain programs. Provides code generation, validation, and automation through CLI and MCP server.
+AI-native toolbox for this Solana workspace. It provides a Rust CLI, an MCP server, and template-driven scaffolding so developers and agents use the same workflows for generation, validation, build, test, pipeline, and local deployment.
 
 ## Components
 
-- **CLI** - Native Rust command-line interface
-- **MCP Server** - JSON-RPC 2.0 server for AI agents (Claude, VSCode Copilot)
-- **Templates** - Code generation templates for instructions, tests, state
-- **Pipelines** - CI/CD scripts
+- **CLI** — native Rust command-line interface in `toolbox/cli`
+- **MCP Server** — JSON-RPC 2.0 server for AI agents in `toolbox/mcp-server`
+- **Templates** — code generation templates in `toolbox/templates`
+- **Docs** — architecture and workflow documentation in `toolbox/docs`
 
 ## Quick Start
 
-### Setup
+### Build
 
 ```bash
-# Build toolbox (one-time)
-cargo build --release --package solana-toolbox
-
-# Optional: Create alias (Linux/macOS - add to ~/.bashrc)
-alias toolbox="./target/release/solana-toolbox"
-
-# Optional: Create alias (Windows PowerShell - add to $PROFILE)
-function toolbox { & ".\target\release\solana-toolbox.exe" @args }
+cargo build --release --manifest-path toolbox/cli/Cargo.toml
+cargo build --release --manifest-path toolbox/mcp-server/Cargo.toml
 ```
 
 ### CLI Commands
 
 ```bash
-# Scaffold new instruction (generates 4 files: instruction, processor, client, test)
-toolbox new instruction Transfer --fields 'amount:u64' --fields 'recipient:Pubkey'
+# Scaffold a new instruction
+solana-toolbox new instruction Transfer --fields amount:u64 --fields recipient:Pubkey
 
-# Generate test
-toolbox test generate test_transfer --instruction Transfer
+# Generate a test template
+solana-toolbox test generate test_transfer --instruction Transfer
 
-# Validate architecture (AGENTS.md compliance)
-toolbox validate all
+# Validate architecture
+solana-toolbox validate all
 
-# Deploy to local validator
-toolbox deploy local
+# Run CI pipeline
+solana-toolbox pipeline --build --test
 
-# Story-driven development
-toolbox story implement 001
-
-# Optimization analysis
-toolbox optimize analyze
+# Run local validator/build/deploy/client workflow
+solana-toolbox deploy local --airdrop 2
 ```
 
-### MCP Server (AI Integration)
+### MCP Server
 
-The MCP server exposes 4 tools to AI agents via JSON-RPC 2.0:
+The MCP server exposes 6 tools to AI agents via JSON-RPC 2.0:
 
-**Build:**
-```bash
-cargo build --release --package solana-mcp-server
-```
+- `solana_build`
+- `solana_test`
+- `solana_pipeline`
+- `solana_deploy_local`
+- `create_instruction`
+- `validate_architecture`
 
-**VSCode Copilot Setup:**
+#### VS Code Copilot Setup
 
 Create `.vscode/mcp.json`:
+
 ```json
 {
   "servers": {
@@ -69,9 +63,10 @@ Create `.vscode/mcp.json`:
 }
 ```
 
-**Claude Desktop Setup:**
+#### Claude Desktop Setup
 
-Edit `%APPDATA%\Claude\claude_desktop_config.json`:
+Edit `%APPDATA%\\Claude\\claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
@@ -83,99 +78,47 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 }
 ```
 
-**Available MCP Tools:**
+## Directory Structure
 
-- ✅ `solana_build` - Compile the Solana program to BPF bytecode
-- ✅ `solana_test` - Run the test suite with LiteSVM
-- ✅ `create_instruction` - Scaffold new instruction with all layers
-- ✅ `validate_architecture` - Check AGENTS.md compliance
-
-**Status:** All 4 tools integrated with JSON-RPC 2.0 protocol and tested end-to-end!
-
-## 📁 Directory Structure
-
-```
+```text
 toolbox/
-├── mcp-server/          # MCP protocol server
-│   ├── src/
-│   │   ├── main.rs      # Server entry point
-│   │   ├── server.rs    # MCP server implementation
-│   │   ├── types.rs     # MCP protocol types
-│   │   └── tools/       # Tool implementations
-│   └── Cargo.toml
-│
-├── cli/                 # Command-line interface
-│   ├── src/
-│   │   ├── main.rs      # CLI entry point
-│   │   └── commands/    # Command implementations
-│   └── Cargo.toml
-│
-├── templates/           # Code generation templates
-│   ├── instruction.rs.template
-│   ├── processor_handler.rs.template
-│   ├── test.rs.template
-│   ├── client_builder.rs.template
-│   ├── error_variant.rs.template
-│   └── state_struct.rs.template
-│
-├── scripts/             # Automation scripts
-│   ├── new_instruction.sh
-│   ├── new_test.sh
-│   └── validate_architecture.sh
-│
-├── pipelines/           # CI/CD pipelines
-│   └── pre-commit.sh
-│
-├── validators/          # Code validators (future)
-├── testing/             # Test utilities (future)
-├── profiling/           # Performance tools (future)
-└── docs/                # Documentation (future)
+├── cli/                 # Human-facing command surface
+├── docs/                # Toolbox architecture and workflow docs
+├── mcp-server/          # Agent-facing MCP server
+├── pipelines/           # Local pre-commit helpers
+└── templates/           # Scaffold templates for instructions/tests/state
 ```
 
-## 🎯 Use Cases
+## Common Workflows
 
-### For AI Agents
+### Build and Test
 
-AI agents can use the MCP server to:
-- Build and test the program
-- Scaffold new features
-- Validate architecture compliance
-- Get structured feedback on code quality
+```bash
+solana-toolbox pipeline --check --build --test
+```
 
-### For Developers
+### Full CI Flow
 
-Developers can use the CLI/scripts to:
-- Quickly scaffold boilerplate code
-- Ensure consistency with AGENTS.md guidelines
-- `solana_build` - Compile Solana program
-- `solana_test` - Run test suite
-- `create_instruction` - Scaffold new instruction
-- `validate_architecture` - Check AGENTS.md compliance
+```bash
+solana-toolbox pipeline --all
+```
 
-## Templates
+### Local Deploy Flow
 
-Templates in `templates/` generate code following AGENTS.md guidelines:
-
-- **instruction.rs.template** - Instruction enum variant
-- **processor_handler.rs.template** - Processor handler function
-- **client_builder.rs.template** - Client instruction builder
-- **test.rs.template** - LiteSVM test
-- **error_variant.rs.template** - Error enum variant
-- **state_struct.rs.template** - Borsh account struct
+```bash
+solana-toolbox deploy local --keep-validator --validator-timeout 60
+```
 
 ## Development
 
 ```bash
-# Build all
 cargo build --workspace
-
-# Test
-cargo test --package solana-mcp-server
 cargo test --package solana-toolbox
+cargo test --package solana-mcp-server
 ```
 
 ## Documentation
 
-- [AGENTS.md](../AGENTS.md) - Architecture guidelines
-- [.github/skills/](../.github/skills/) - AI skills
-- [docs/](docs/) - Additional documentation
+- [AGENTS.md](../AGENTS.md) — repository architecture guidelines
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — toolbox architecture and process diagrams
+- [../.github/skills/](../.github/skills/) — agent skills and workflows

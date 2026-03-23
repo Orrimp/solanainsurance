@@ -32,6 +32,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const DEFAULT_LEDGER_DIR: &str = "target/test-ledger";
 
+const DEFAULT_LOCAL_RPC_URL: &str = "http://127.0.0.1:8899";
+const DEFAULT_PROGRAM_SO: &str = "target/deploy/insurance.so";
+
 fn validator_ledger_dir() -> String {
     if let Ok(custom_dir) = env::var("SOLANA_TOOLBOX_LEDGER_DIR") {
         return custom_dir;
@@ -54,6 +57,62 @@ fn make_fallback_ledger_dir() -> String {
         .join(format!("solana-toolbox-ledger-{ts}"))
         .to_string_lossy()
         .to_string()
+}
+
+/// Configuration for local build/deploy/client workflow.
+pub struct LocalRunConfig {
+    pub airdrop_sol: u64,
+    pub keep_validator: bool,
+    pub skip_build: bool,
+    pub skip_client: bool,
+    pub validator_timeout: u64,
+    pub rpc_url: String,
+    pub program_so: String,
+}
+
+impl Default for LocalRunConfig {
+    fn default() -> Self {
+        Self {
+            airdrop_sol: 2,
+            keep_validator: false,
+            skip_build: false,
+            skip_client: false,
+            validator_timeout: 30,
+            rpc_url: DEFAULT_LOCAL_RPC_URL.to_string(),
+            program_so: DEFAULT_PROGRAM_SO.to_string(),
+        }
+    }
+}
+
+struct ValidatorGuard {
+    child: Option<std::process::Child>,
+    keep_validator: bool,
+}
+
+impl ValidatorGuard {
+    fn new(keep_validator: bool) -> Self {
+        Self {
+            child: None,
+            keep_validator,
+        }
+    }
+
+    fn set_child(&mut self, child: Option<std::process::Child>) {
+        self.child = child;
+    }
+}
+
+impl Drop for ValidatorGuard {
+    fn drop(&mut self) {
+        if self.keep_validator {
+            return;
+        }
+
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
 }
 
 /// Check if solana-test-validator is available
@@ -235,18 +294,30 @@ pub fn run_tests() -> Result<()> {
 /// ensure_validator(30).unwrap();
 /// ```
 pub fn ensure_validator(timeout_secs: u64) -> Result<()> {
+    let _ = ensure_validator_with_options(timeout_secs, "http://localhost:8899", 2)?;
+    Ok(())
+}
+
+/// Ensure validator is running, auto-starting if needed.
+///
+/// Returns a child handle when this function started the validator process.
+pub fn ensure_validator_with_options(
+    timeout_secs: u64,
+    rpc_url: &str,
+    airdrop_sol: u64,
+) -> Result<Option<std::process::Child>> {
     println!("   {} Checking validator status...", "🔍".bright_yellow());
 
     // Check if validator is already running
     let check = Command::new("solana")
-        .args(&["cluster-version", "-u", "http://localhost:8899"])
+        .args(["cluster-version", "-u", rpc_url])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status();
 
     if check.is_ok() && check.unwrap().success() {
-        println!("   {} Validator already running at http://localhost:8899", "✅".green());
-        return Ok(());
+        println!("   {} Validator already running at {}", "✅".green(), rpc_url);
+        return Ok(None);
     }
 
     println!("   {} Validator not detected — starting solana-test-validator...", "⚠️".yellow());
@@ -351,7 +422,7 @@ pub fn ensure_validator(timeout_secs: u64) -> Result<()> {
         thread::sleep(Duration::from_millis(500));
         
         let check = Command::new("solana")
-            .args(&["cluster-version", "-u", "http://localhost:8899"])
+            .args(["cluster-version", "-u", rpc_url])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
@@ -363,18 +434,18 @@ pub fn ensure_validator(timeout_secs: u64) -> Result<()> {
             // Fund the default keypair
             println!("   {} Funding default keypair...", "💰".bright_yellow());
             let airdrop = Command::new("solana")
-                .args(&["airdrop", "2", "-u", "http://localhost:8899"])
+                .args(["airdrop", &airdrop_sol.to_string(), "-u", rpc_url])
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .status();
             
             if airdrop.is_ok() && airdrop.unwrap().success() {
-                println!("   {} Airdrop successful (2 SOL)", "✅".green());
+                println!("   {} Airdrop successful ({} SOL)", "✅".green(), airdrop_sol);
             } else {
                 println!("   {} Airdrop failed (keypair may already be funded)", "⚠️".yellow());
             }
             
-            return Ok(());
+            return Ok(Some(child));
         }
     }
 
@@ -425,16 +496,19 @@ pub fn start_validator() -> Result<()> {
 /// println!("Deployed program ID: {}", program_id);
 /// ```
 pub fn deploy_program() -> Result<String> {
+    deploy_program_with_options("http://localhost:8899", "target/deploy/insurance.so")
+}
+
+/// Deploy program with explicit RPC URL and binary path.
+pub fn deploy_program_with_options(rpc_url: &str, program_so: &str) -> Result<String> {
     println!("   {} Deploying program...", "📦".bright_yellow());
 
-    // TODO: Make program name configurable - currently assumes first .so file in target/deploy/
-    let so_path = "target/deploy/insurance.so";
-    if !Path::new(so_path).exists() {
-        anyhow::bail!("Program binary not found: {}", so_path);
+    if !Path::new(program_so).exists() {
+        anyhow::bail!("Program binary not found: {}", program_so);
     }
 
     let output = Command::new("solana")
-        .args(&["program", "deploy", so_path])
+        .args(["program", "deploy", "-u", rpc_url, program_so])
         .output()
         .context("Failed to deploy program")?;
 
@@ -457,6 +531,144 @@ pub fn deploy_program() -> Result<String> {
     println!("   {} Program ID: {}", "📍".bright_cyan(), program_id.bright_yellow());
 
     Ok(program_id)
+}
+
+/// Build program with cargo build-sbf and fallback to solana program build.
+pub fn build_program_with_fallback() -> Result<()> {
+    println!("   {} Building Solana program...", "🔨".bright_yellow());
+
+    let cargo_status = Command::new("cargo").arg("build-sbf").status();
+    if cargo_status.is_ok() && cargo_status.unwrap().success() {
+        println!("   {} Build successful (cargo build-sbf)", "✅".green());
+        return Ok(());
+    }
+
+    println!(
+        "   {} cargo build-sbf unavailable/failed; trying solana program build...",
+        "⚠️".yellow()
+    );
+
+    let solana_status = Command::new("solana")
+        .args(["program", "build"])
+        .status()
+        .context("Failed to run solana program build")?;
+
+    if !solana_status.success() {
+        anyhow::bail!("solana program build failed");
+    }
+
+    println!("   {} Build successful (solana program build)", "✅".green());
+    Ok(())
+}
+
+fn ensure_default_keypair() -> Result<()> {
+    let output = Command::new("solana")
+        .args(["config", "get"])
+        .output()
+        .context("Failed to read solana config")?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let mut keypair_path = stdout
+        .lines()
+        .find(|line| line.contains("Keypair Path:"))
+        .and_then(|line| line.split(':').nth(1))
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
+
+    if keypair_path.is_empty() || keypair_path == "ASK" || keypair_path.starts_with("prompt:") {
+        let home = env::var("HOME")
+            .or_else(|_| env::var("USERPROFILE"))
+            .unwrap_or_else(|_| ".".to_string());
+        keypair_path = format!("{home}/.config/solana/id.json");
+
+        let status = Command::new("solana")
+            .args(["config", "set", "--keypair", &keypair_path])
+            .status()
+            .context("Failed to set default keypair path")?;
+
+        if !status.success() {
+            anyhow::bail!("Could not set keypair path in solana config");
+        }
+    }
+
+    if Path::new(&keypair_path).exists() {
+        return Ok(());
+    }
+
+    if let Some(parent) = Path::new(&keypair_path).parent() {
+        fs::create_dir_all(parent).context("Failed to create keypair directory")?;
+    }
+
+    let status = Command::new("solana-keygen")
+        .args(["new", "--no-bip39-passphrase", "-o", &keypair_path, "-f"])
+        .status()
+        .context("Failed to generate keypair")?;
+
+    if !status.success() {
+        anyhow::bail!("solana-keygen failed creating keypair");
+    }
+
+    Ok(())
+}
+
+/// Script-equivalent local workflow: start validator, build, deploy, and optionally run client.
+pub fn run_local_workflow(config: LocalRunConfig) -> Result<()> {
+    println!("{}", "🚀 Running local workflow...".bright_blue().bold());
+
+    if !check_solana_cli()? {
+        anyhow::bail!("solana CLI not found in PATH");
+    }
+
+    let validator_check = Command::new("solana-test-validator")
+        .arg("--help")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    if validator_check.is_err() || !validator_check.unwrap().success() {
+        anyhow::bail!("solana-test-validator not found in PATH");
+    }
+
+    ensure_default_keypair()?;
+
+    let mut guard = ValidatorGuard::new(config.keep_validator);
+    let started = ensure_validator_with_options(
+        config.validator_timeout,
+        &config.rpc_url,
+        config.airdrop_sol,
+    )?;
+    guard.set_child(started);
+
+    let set_url = Command::new("solana")
+        .args(["config", "set", "--url", &config.rpc_url])
+        .status()
+        .context("Failed to set solana config url")?;
+    if !set_url.success() {
+        anyhow::bail!("Could not set solana config URL to {}", config.rpc_url);
+    }
+
+    if !config.skip_build {
+        build_program_with_fallback()?;
+    } else {
+        println!("   {} Skipping build (per flag)", "⊝".bright_black());
+    }
+
+    if !Path::new(&config.program_so).exists() {
+        anyhow::bail!("Program artifact not found: {}", config.program_so);
+    }
+
+    let _program_id = deploy_program_with_options(&config.rpc_url, &config.program_so)?;
+
+    if !config.skip_client {
+        run_client()?;
+    } else {
+        println!("   {} Skipping client run (per flag)", "⊝".bright_black());
+    }
+
+    if config.keep_validator {
+        println!("   {} Validator left running", "ℹ️".bright_blue());
+    }
+
+    Ok(())
 }
 
 /// Run the example client

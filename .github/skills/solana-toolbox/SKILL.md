@@ -1,7 +1,7 @@
 ---
 name: solana-toolbox
-description: "Use the Solana MCP toolbox for AI-assisted development. Provides 5 tools: solana_build (compile program), solana_test (run tests), solana_pipeline (run CI/CD pipeline), create_instruction (scaffold new instruction), validate_architecture (check AGENTS.md compliance). Use for: rapid feature development, CI/CD automation, automated validation, test execution, and code generation following project architecture patterns."
-argument-hint: "Specify tool name and parameters: solana_build, solana_test, solana_pipeline, create_instruction, or validate_architecture"
+description: "Use the Solana MCP toolbox for AI-assisted development. Provides 6 tools: solana_build (compile program), solana_test (run tests), solana_pipeline (run CI/CD pipeline), solana_deploy_local (script-equivalent local workflow), create_instruction (scaffold new instruction), validate_architecture (check AGENTS.md compliance). Use for: rapid feature development, CI/CD automation, automated validation, test execution, and code generation following project architecture patterns."
+argument-hint: "Specify tool name and parameters: solana_build, solana_test, solana_pipeline, solana_deploy_local, create_instruction, or validate_architecture"
 applyTo:
   - "**/*.rs"
   - "**/*.toml"
@@ -14,7 +14,7 @@ Interact with the Solana MCP server to build, test, run CI/CD pipelines, scaffol
 
 ## Available MCP Tools
 
-The toolbox exposes 5 tools via Model Context Protocol (JSON-RPC 2.0):
+The toolbox exposes 6 tools via Model Context Protocol (JSON-RPC 2.0):
 
 ### 1. `solana_build` - Compile the Program
 
@@ -194,7 +194,37 @@ Run type-check only for quick feedback
 
 ---
 
-### 4. `create_instruction` - Scaffold New Instruction
+### 4. `solana_deploy_local` - Script-Equivalent Local Workflow
+
+**Purpose:** Run the integrated replacement for `run_local.sh` and `scripts/run_local.sh`.
+
+**Parameters:**
+- `airdrop` (integer, optional, default: 2)
+- `keep_validator` (boolean, optional, default: false)
+- `skip_build` (boolean, optional, default: false)
+- `skip_client` (boolean, optional, default: false)
+- `validator_timeout` (integer, optional, default: 30)
+- `rpc_url` (string, optional, default: `http://127.0.0.1:8899`)
+- `program_so` (string, optional): Override path to program binary
+
+**When to use:**
+- You want script behavior without shell scripts
+- You need a one-shot local validator + deploy workflow
+- You need to skip build/client while keeping deploy logic
+
+**Example invocations:**
+
+```
+Run local deploy flow with default options
+```
+
+```
+Run local deploy flow and keep validator alive
+```
+
+---
+
+### 5. `create_instruction` - Scaffold New Instruction
 
 **Purpose:** Generate a complete instruction implementation following AGENTS.md architecture patterns.
 
@@ -258,7 +288,7 @@ new_owner (immutable), and state_account (mutable)
 
 ---
 
-### 5. `validate_architecture` - Check Compliance
+### 6. `validate_architecture` - Check Compliance
 
 **Purpose:** Validate codebase compliance with AGENTS.md architectural guidelines.
 

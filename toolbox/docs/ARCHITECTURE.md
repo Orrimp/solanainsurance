@@ -10,7 +10,8 @@ MCP Server (JSON-RPC 2.0 over stdio)
          |
          v
 Tools: solana_build, solana_test, solana_pipeline,
-       create_instruction, validate_architecture
+       solana_deploy_local, create_instruction,
+       validate_architecture
          |
          v
 Rust CLI + Templates
@@ -29,6 +30,7 @@ On-chain program + off-chain client
   - `solana_build`
   - `solana_test`
   - `solana_pipeline`
+  - `solana_deploy_local`
   - `create_instruction`
   - `validate_architecture`
 - Purpose: expose deterministic development operations to AI agents
@@ -47,11 +49,101 @@ On-chain program + off-chain client
 
 ## Interaction Flow
 
-1. Agent or developer invokes a toolbox action (MCP or CLI).
-2. Command/tool executes build/test/pipeline or uses templates for code generation.
-3. Output is returned as structured text for review.
-4. Developer integrates generated code into `src/` and `client/`.
-5. Validation (`validate_architecture`) verifies conventions.
+1. Developer starts from a story, requirement, or bug report.
+2. Agent or developer invokes toolbox actions via CLI or MCP.
+3. Code is scaffolded (`create_instruction`) and implemented in on-chain/off-chain layers.
+4. Structural checks run with `validate_architecture`.
+5. Build/test/deploy confidence is established via `solana_build`, `solana_test`, or `solana_pipeline`.
+6. Local end-to-end execution uses `solana_deploy_local` or pipeline deploy/client steps.
+7. Results are reviewed, refined, and merged when quality gates pass.
+
+## Development Process Diagram
+
+```mermaid
+flowchart TD
+  A[Requirement or Story] --> B[Design and Account Model]
+  B --> C{Implementation Path}
+
+  C -->|New instruction| D[create_instruction]
+  C -->|Modify existing flow| E[Edit src and client modules]
+
+  D --> F[Implement processor and state logic]
+  E --> F
+
+  F --> G[validate_architecture]
+  G --> H{Validation OK?}
+  H -->|No| F
+  H -->|Yes| I[solana_build or cargo check]
+
+  I --> J{Build OK?}
+  J -->|No| F
+  J -->|Yes| K[solana_test]
+
+  K --> L{Tests OK?}
+  L -->|No| F
+  L -->|Yes| M{Execution Mode}
+
+  M -->|Full CI| N[solana_pipeline --all]
+  M -->|Local run| O[solana_deploy_local]
+
+  N --> P{Pipeline green?}
+  O --> Q{Local flow green?}
+
+  P -->|No| F
+  Q -->|No| F
+
+  P -->|Yes| R[Review and PR]
+  Q -->|Yes| R
+
+  R --> S[Merge]
+  S --> T[Post-merge monitoring and iteration]
+```
+
+## Tool Interaction Diagram
+
+```mermaid
+flowchart LR
+  Dev[Developer or Agent] --> Choice{Interaction Surface}
+
+  Choice -->|Editor or chat tool call| MCP[MCP Server]
+  Choice -->|Terminal command| CLI[solana-toolbox CLI]
+
+  MCP --> BuildTool[solana_build]
+  MCP --> TestTool[solana_test]
+  MCP --> PipelineTool[solana_pipeline]
+  MCP --> DeployTool[solana_deploy_local]
+  MCP --> ScaffoldTool[create_instruction]
+  MCP --> ValidateTool[validate_architecture]
+
+  CLI --> BuildCmd[build and check flows]
+  CLI --> TestCmd[test flows]
+  CLI --> PipelineCmd[pipeline workflow]
+  CLI --> DeployCmd[deploy local workflow]
+  CLI --> StoryCmd[story and generation flows]
+  CLI --> ValidateCmd[architecture validation]
+
+  ScaffoldTool --> Templates[toolbox templates]
+  StoryCmd --> Templates
+
+  BuildTool --> Cargo[Cargo and Solana CLI]
+  TestTool --> Cargo
+  PipelineTool --> Cargo
+  DeployTool --> Cargo
+  BuildCmd --> Cargo
+  TestCmd --> Cargo
+  PipelineCmd --> Cargo
+  DeployCmd --> Cargo
+
+  Templates --> Codebase[src and client modules]
+  Cargo --> Codebase
+  Cargo --> Validator[Local validator or RPC target]
+
+  ValidateTool --> Report[Structured output and diagnostics]
+  ValidateCmd --> Report
+  Cargo --> Report
+  Codebase --> Report
+  Report --> Dev
+```
 
 ## Runtime Layers
 

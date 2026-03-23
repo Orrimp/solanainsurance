@@ -44,6 +44,7 @@
 //! - **solana_build**: Compile the program to BPF bytecode
 //! - **solana_test**: Run the test suite with optional filters
 //! - **solana_pipeline**: Run full CI/CD pipeline with configurable steps
+//! - **solana_deploy_local**: Run integrated local validator/build/deploy/client workflow
 //! - **create_instruction**: Scaffold a new instruction with templates
 //! - **validate_architecture**: Check AGENTS.md compliance
 //!
@@ -107,6 +108,7 @@ async fn main() -> anyhow::Result<()> {
     server.register_tool(Box::new(SolanaBuildTool)).await;
     server.register_tool(Box::new(SolanaTestTool)).await;
     server.register_tool(Box::new(SolanaPipelineTool)).await;
+    server.register_tool(Box::new(SolanaDeployLocalTool)).await;
     server.register_tool(Box::new(CreateInstructionTool)).await;
     server.register_tool(Box::new(ValidateArchitectureTool)).await;
 

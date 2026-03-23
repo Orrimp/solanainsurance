@@ -106,6 +106,22 @@ solana program deploy -u localhost ./target/deploy/insurance.so
 cargo run --example client
 ```
 
+## Local Workflow (Script-Equivalent)
+
+Run the integrated local workflow (validator + optional build + deploy + optional client):
+
+```bash
+solana-toolbox deploy local --airdrop 2
+```
+
+Useful flags:
+
+```bash
+solana-toolbox deploy local --skip-build --skip-client
+solana-toolbox deploy local --keep-validator --validator-timeout 60
+solana-toolbox deploy local --program-so target/deploy/insurance.so
+```
+
 ## Run Tests
 
 ```bash

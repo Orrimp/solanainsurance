@@ -236,14 +236,36 @@ pub fn validate_all() -> Result<()> {
     Ok(())
 }
 
-/// Deploy to local validator
-pub fn deploy_local() -> Result<()> {
-    use crate::deployment;
+/// Deploy to local validator with script-equivalent options.
+pub fn deploy_local(
+    airdrop_sol: u64,
+    keep_validator: bool,
+    skip_build: bool,
+    skip_client: bool,
+    validator_timeout: u64,
+    rpc_url: &str,
+    program_so: Option<&str>,
+) -> Result<()> {
+    use crate::deployment::{self, LocalRunConfig};
 
     println!("{}", "🚀 Deploying to local validator...".bright_blue().bold());
     println!();
 
-    deployment::run_deployment_pipeline()?;
+    let mut config = LocalRunConfig {
+        airdrop_sol,
+        keep_validator,
+        skip_build,
+        skip_client,
+        validator_timeout,
+        rpc_url: rpc_url.to_string(),
+        ..Default::default()
+    };
+
+    if let Some(path) = program_so {
+        config.program_so = path.to_string();
+    }
+
+    deployment::run_local_workflow(config)?;
 
     Ok(())
 }

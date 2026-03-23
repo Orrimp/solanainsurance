@@ -1,4 +1,5 @@
 /target
+.idea/
 
 # macOS cruft
 .DS_Store

@@ -263,8 +263,8 @@ ACTIVITY 1          ACTIVITY 2          ACTIVITY 3  ...     ← Backbone (what u
 | 7 | Complete InitializePensioner | 🔲 TODO — MVP blocker |
 | 8 | PDA-Based Account Addressing | 🔲 TODO — Release 2 |
 | 9 | Client SDK completeness | ⚠️ PARTIAL |
-| 10 | Test Coverage | ⚠️ PARTIAL — blocked by Epic 7 |
-| 11 | Build & DevOps | ⚠️ PARTIAL — `run_local.sh` exists; release profile, Clippy, CI missing |
+| 10 | Test Coverage | ✅ DONE — `full_coverage_tests` covers stateful handlers in `src/lib.rs` |
+| 11 | Build & DevOps | ⚠️ PARTIAL — shell scripts replaced by `solana-toolbox deploy local`; release profile, Clippy, CI missing |
 | 12 | Security Hardening | ⚠️ PARTIAL — ownership/auth checks done; authority transfer missing |
 | 13 | Forward Compatibility | 🔲 TODO — Future |
 

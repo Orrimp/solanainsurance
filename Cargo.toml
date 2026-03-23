@@ -16,8 +16,6 @@ solana-program = "3.0.0"
 solana-system-interface = { version = "2", features = ["bincode"] }
 borsh = "1.0"
 thiserror = "1.0"
-arrayref = "0.3.7"
-digest = "0.10.7"
 # Pin blake3 and base64ct below versions that use `edition = "2024"` in their
 # manifests. cargo build-sbf uses platform-tools v1.51 (Cargo 1.84.0) which
 # doesn't support the `edition2024` Cargo feature (stabilised in Cargo 1.85).

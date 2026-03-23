@@ -1,6 +1,6 @@
 # Story 002 — Full LiteSVM Test Coverage + Missing Instruction Builders
 
-> **Status:** 🔲 TODO
+> **Status:** ✅ DONE
 > **Priority:** MVP
 > **Source:** Story map Activity 1 › Goal 1.2 · Activity 2–7 (all stateful handlers)
 > **Linked epics:** Epic 9 (Client SDK completeness), Epic 10 (Test Coverage)
@@ -27,6 +27,9 @@ instruction data by hand.
 Story 001 resolved the `todo!()` panics in `InitializePensioner` and added 3 LiteSVM tests
 for that handler. All other 10 handlers (11 stateful; 2 read-only query handlers `GetPoints` /
 `GetAllPoints` are explicitly out of scope) have **zero test coverage**.
+
+Implementation note: this story's builders and full-coverage LiteSVM tests are now present in
+`client/instructions.rs` and `src/lib.rs`. The narrative below is retained as delivery history.
 
 Four instruction builders are also missing from `client/instructions.rs`:
 
